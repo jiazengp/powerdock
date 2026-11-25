@@ -1,0 +1,26 @@
+#include <windows.h>
+#include "Generated Files/ProductVersion.g.h"
+101 ICON "../assets/PowerDock.ico"
+1 VERSIONINFO
+FILEVERSION PD_FILE_VERSION
+PRODUCTVERSION PD_FILE_VERSION
+FILEFLAGS PD_FILE_FLAGS
+FILEOS VOS_NT_WINDOWS32
+FILETYPE VFT_APP
+BEGIN
+ BLOCK "StringFileInfo"
+ BEGIN
+  BLOCK "040904B0"
+  BEGIN
+   VALUE "FileDescription", "PowerDock\0"
+   VALUE "ProductName", "PowerDock\0"
+   VALUE "OriginalFilename", "PowerDockUI.exe\0"
+   VALUE "FileVersion", PD_VERSION_STRING
+   VALUE "ProductVersion", PD_VERSION_STRING
+  END
+ END
+ BLOCK "VarFileInfo"
+ BEGIN
+  VALUE "Translation", 0x409, 1200
+ END
+END

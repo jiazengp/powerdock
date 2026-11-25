@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      release-tag:
+        type: string
+        default: ''
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+
+jobs:
+  windows:
+    name: Windows x64
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      CARGO_TERM_COLOR: always
+      RELEASE_TAG: ${{ inputs.release-tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check release version
+        if: env.RELEASE_TAG != ''
+        run: |
+          $version = (Select-String -LiteralPath Cargo.toml -Pattern '^version = "([0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?)"$').Matches.Groups[1].Value
+          if ($env:RELEASE_TAG -cne "v$version") {
+            throw "Tag $env:RELEASE_TAG does not match Cargo.toml version $version."
+          }
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup show active-toolchain
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned Rust toolchain installation failed.' }
+      - name: Cache dependencies
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ui/packages
+          key: windows-vs2026-deps-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'ui/packages.lock.json') }}
+      - name: Check and build Rust and WinUI
+        run: ./scripts/build.ps1
+      - name: Restore pinned packaging tool
+        run: |
+          dotnet tool restore --configfile NuGet.Config
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned Velopack restore failed.' }
+      - name: Verify real delta patch, fallback and restart
+        run: ./scripts/test-updates.ps1
+      - name: Package portable application
+        run: ./scripts/package.ps1 -MetadataPath target/package.json
+      - name: Verify archive and packaged commands
+        run: ./scripts/test-package.ps1 -MetadataPath target/package.json
+      - name: Build self-updating installer, portable and channel feed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ./scripts/package-updates.ps1 -MetadataPath target/package.json -FetchPrevious:($env:RELEASE_TAG -ne '') -Repository '${{ github.repository }}'
+      - name: Verify self-updating portable layout and CLI
+        run: ./scripts/test-managed-package.ps1
+      - name: Verify Setup installer artifact, version and checksums
+        run: ./scripts/test-setup-package.ps1
+      - name: Upload validation evidence
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: update-validation-windows-x64
+          path: target/*test-results.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload portable, Setup installer, update feed and checksums
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: powerdock-windows-x64
+          path: |
+            dist/*.zip
+            dist/*.zip.sha256
+            dist/updates/**
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0

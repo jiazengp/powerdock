@@ -1,0 +1,25 @@
+/target/
+/dist/
+/app/
+*.pdb
+*.log
+/.vs/
+/.idea/
+/.vscode/
+*.user
+*.suo
+*.dmp
+.env
+.env.*
+
+# Generated from locales/*.json by generate-resources.ps1
+/ui/Strings/
+
+# Local-only notes, research and agent skills
+/docs/
+/plans/
+/skills/
+/experiments/
+/SUPPORTED-DEVICES.md
+/assets/screenshots/
+$null
