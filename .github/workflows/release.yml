@@ -1,0 +1,51 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    uses: ./.github/workflows/ci.yml
+    with:
+      release-tag: ${{ github.ref_name }}
+  draft:
+    name: Create draft release
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: powerdock-windows-x64
+          path: release-assets
+      - name: Verify checksum and create draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        shell: bash
+        working-directory: release-assets
+        run: |
+          set -euo pipefail
+          sha256sum --check -- *.zip.sha256
+          mapfile -t feeds < <(find updates -name SHA256SUMS -type f)
+          test "${#feeds[@]}" -eq 1
+          (cd "$(dirname "${feeds[0]}")" && sha256sum --check SHA256SUMS)
+          mapfile -d '' -t installers < <(find updates -type f -name 'PowerDock-*-Setup.exe' -print0)
+          test "${#installers[@]}" -eq 1
+          test -s "${installers[0]}"
+          (cd "$(dirname "${installers[0]}")" && sha256sum --check "$(basename "${installers[0]}").sha256")
+          args=(--verify-tag --draft --title "PowerDock $RELEASE_TAG" --generate-notes)
+          if [[ "$RELEASE_TAG" == *-* ]]; then args+=(--prerelease); fi
+          mapfile -d '' -t assets < <(find updates -type f -print0)
+          gh release create "$RELEASE_TAG" "${args[@]}" -- *.zip *.zip.sha256 "${assets[@]}"
