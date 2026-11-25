@@ -1,0 +1,7 @@
+* text=auto eol=lf
+*.png binary
+*.ico binary
+*.bmp binary
+# Preserve upstream reference files verbatim, including their final blank line.
+vendor/MICROSOFT-MIT.txt whitespace=-blank-at-eof
+vendor/microsoft-create-window.rs whitespace=-blank-at-eof

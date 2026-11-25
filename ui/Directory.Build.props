@@ -1,0 +1,3 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup><ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally><NuGetAudit>true</NuGetAudit></PropertyGroup>
+</Project>

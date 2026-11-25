@@ -1,0 +1,6 @@
+packages/
+obj/
+Generated Files/
+x64/
+*.vcxproj.user
+build.log

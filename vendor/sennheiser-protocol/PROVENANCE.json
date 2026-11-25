@@ -1,0 +1,44 @@
+{
+  "repository": "xndbogdan/sennheiser-control",
+  "commit": "5ec3c873fb8f6b9d1d7225edec8cf566f1a485d6",
+  "license": "MIT declared in upstream workspace/package manifests",
+  "manifest_adaptation": "Only Cargo workspace inheritance expanded for standalone use. Source files unmodified. No upstream LICENSE file in pinned tree.",
+  "files": [
+    {
+      "upstream_path": "crates/protocol/src/caps.rs",
+      "sha256": "90597f40daa8a541ed8e0607f6c84c2bf16d0502ab1ad7a898289c64fbc813fd"
+    },
+    {
+      "upstream_path": "crates/protocol/src/eq.rs",
+      "sha256": "bf3b07d32aa4c5ced162df16f447edf2753dd1ab1bfd73105feceadff418868d"
+    },
+    {
+      "upstream_path": "crates/protocol/src/frame.rs",
+      "sha256": "728faed9ceca0ffbc07fc4cea72e3c05d10b125f0d6efa7077f0ebbb3d265b03"
+    },
+    {
+      "upstream_path": "crates/protocol/src/ids.rs",
+      "sha256": "1ceda04d91aa17f67ea88544b6b48f9368903dbfb26ac8b066637c13d93bf2ee"
+    },
+    {
+      "upstream_path": "crates/protocol/src/lib.rs",
+      "sha256": "ceb15ba754deaffa3f996305962663e4d7fcc286eb16403dc26b564c71958471"
+    },
+    {
+      "upstream_path": "crates/protocol/src/product.rs",
+      "sha256": "e7fa77016546b0918bce439274724a2f1a8b98e5707763fdee5186631c2c7607"
+    },
+    {
+      "upstream_path": "crates/protocol/src/request.rs",
+      "sha256": "8f994f113c65120ceb1724714b13406333599bdc60d8a41fafc7bca69229c012"
+    },
+    {
+      "upstream_path": "crates/protocol/src/types.rs",
+      "sha256": "0b3817593879dc3b429b4452170d36b6b7315a4c075277f2eb9e6579c7b64d57"
+    },
+    {
+      "upstream_path": "crates/protocol/src/update.rs",
+      "sha256": "df5000b8ca54ff420f5b429080b28bf99ae4c5c7df4670428a479b9f71e7424f"
+    }
+  ]
+}
