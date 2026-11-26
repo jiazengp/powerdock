@@ -1,6 +1,7 @@
 //! GitHub transport adapter for Velopack (MIT), based on its GithubSource.
 //! Keep patching, verification and installation in Velopack. Bound network time and
 //! include /latest so many preview releases cannot hide the latest stable release.
+use super::windows_http;
 use semver::Version;
 use serde::Deserialize;
 use std::{
@@ -16,8 +17,12 @@ pub const REPOSITORY: &str = "https://github.com/jiazengp/powerdock";
 pub const STABLE: &str = "win-x64-stable";
 pub const PREVIEW: &str = "win-x64-preview";
 pub const PACKAGE_ID: &str = "PowerDock";
+const MAX_FEED_BYTES: usize = 8 * 1024 * 1024;
 
 pub(super) fn http_status(error: &Error) -> Option<u16> {
+    if let Error::Io(error) = error {
+        return windows_http::status_code(error);
+    }
     if let Error::Network(network) = error
         && let velopack::NetworkError::Http(http) = network.as_ref()
     {
@@ -40,12 +45,14 @@ struct Asset {
 }
 pub struct Github {
     preview: bool,
+    follow_system_proxy: bool,
     urls: Mutex<HashMap<String, String>>,
 }
 impl Github {
-    pub fn new(preview: bool) -> Self {
+    pub fn new(preview: bool, follow_system_proxy: bool) -> Self {
         Self {
             preview,
+            follow_system_proxy,
             urls: Mutex::new(HashMap::new()),
         }
     }
@@ -64,9 +71,13 @@ impl Github {
             ],
         }
     }
-    fn get(url: &str) -> Result<String, Error> {
-        let value = download::download_url_as_string(url, Some(&Self::options(10_000)))?;
-        if value.len() > 8 * 1024 * 1024 {
+    fn get(&self, url: &str) -> Result<String, Error> {
+        let value = if self.follow_system_proxy {
+            windows_http::get(url, MAX_FEED_BYTES)?
+        } else {
+            download::download_url_as_string(url, Some(&Self::options(10_000)))?
+        };
+        if value.len() > MAX_FEED_BYTES {
             return Err(Error::Other("source_response_too_large".into()));
         }
         Ok(value)
@@ -108,8 +119,8 @@ impl UpdateSource for Github {
     ) -> Result<VelopackAssetFeed, Error> {
         let base = "https://api.github.com/repos/jiazengp/powerdock/releases";
         let mut releases: Vec<Release> =
-            serde_json::from_str(&Self::get(&format!("{base}?per_page=100&page=1"))?)?;
-        match Self::get(&format!("{base}/latest")) {
+            serde_json::from_str(&self.get(&format!("{base}?per_page=100&page=1"))?)?;
+        match self.get(&format!("{base}/latest")) {
             Ok(json) => releases.push(serde_json::from_str(&json)?),
             Err(error) if http_status(&error) == Some(404) => {}
             Err(error) => return Err(error),
@@ -145,7 +156,7 @@ impl UpdateSource for Github {
             let Some(url) = urls.get(&name).cloned() else {
                 continue;
             };
-            let feed: VelopackAssetFeed = serde_json::from_str(&Self::get(&url)?)?;
+            let feed: VelopackAssetFeed = serde_json::from_str(&self.get(&url)?)?;
             if feed.Assets.len() > 2000 {
                 return Err(Error::Other("source_invalid_feed".into()));
             }
@@ -181,11 +192,16 @@ impl UpdateSource for Github {
             .get(&asset.FileName.to_ascii_lowercase())
             .cloned()
             .ok_or_else(|| Error::Other("source_asset_missing".into()))?;
-        download::download_url_to_file(&url, path, Some(&Self::options(240_000)), |value| {
+        let report = |value| {
             if let Some(tx) = &progress {
                 let _ = tx.send(value);
             }
-        })
+        };
+        if self.follow_system_proxy {
+            windows_http::download(&url, path, asset.Size, report)
+        } else {
+            download::download_url_to_file(&url, path, Some(&Self::options(240_000)), report)
+        }
     }
 }
 #[cfg(test)]

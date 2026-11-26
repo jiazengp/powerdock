@@ -1,4 +1,17 @@
 use super::*;
+
+#[test]
+fn update_proxy_defaults_to_system_and_preserves_opt_out() {
+    let mut old: Settings =
+        serde_json::from_str(r#"{"updates":{"preview":true,"auto_download":false}}"#).unwrap();
+    assert!(old.updates.follow_system_proxy);
+    old.updates.follow_system_proxy = false;
+    let loaded: Settings = serde_json::from_str(&serde_json::to_string(&old).unwrap()).unwrap();
+    assert!(!loaded.updates.follow_system_proxy);
+    assert!(loaded.updates.preview);
+    assert!(!loaded.updates.auto_download);
+}
+
 #[test]
 fn notification_preferences_migrate_and_roundtrip_without_changing_alert_thresholds() {
     let old: Settings = serde_json::from_str(r#"{"version":1,"threshold":30}"#).unwrap();

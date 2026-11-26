@@ -17,7 +17,7 @@ fn overlay_duration(value: &str) -> Result<u64, String> {
 }
 #[derive(Args, Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-#[command(group(clap::ArgGroup::new("general").required(true).multiple(true).args(["language","theme","reduce_motion","auto_check","auto_download","preview_updates","notification_style","notification_sound","notification_after_fullscreen","overlay_position","overlay_duration","overlay_monitor","overlay_transparency"])))]
+#[command(group(clap::ArgGroup::new("general").required(true).multiple(true).args(["language","theme","reduce_motion","auto_check","auto_download","preview_updates","follow_system_proxy","notification_style","notification_sound","notification_after_fullscreen","overlay_position","overlay_duration","overlay_monitor","overlay_transparency"])))]
 pub struct GeneralPatch {
     #[arg(long, value_enum)]
     pub language: Option<crate::i18n::Language>,
@@ -31,6 +31,8 @@ pub struct GeneralPatch {
     pub auto_download: Option<bool>,
     #[arg(long, action=clap::ArgAction::Set)]
     pub preview_updates: Option<bool>,
+    #[arg(long, action=clap::ArgAction::Set)]
+    pub follow_system_proxy: Option<bool>,
     #[arg(long, value_enum)]
     pub notification_style: Option<crate::settings::NotificationStyle>,
     #[arg(long, action=clap::ArgAction::Set)]
@@ -55,6 +57,7 @@ impl GeneralPatch {
             && self.auto_check.is_none()
             && self.auto_download.is_none()
             && self.preview_updates.is_none()
+            && self.follow_system_proxy.is_none()
             && self.notification_style.is_none()
             && self.notification_sound.is_none()
             && self.notification_after_fullscreen.is_none()

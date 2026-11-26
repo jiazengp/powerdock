@@ -133,6 +133,7 @@ pub struct UpdatePreferences {
     pub auto_check: bool,
     pub auto_download: bool,
     pub preview: bool,
+    pub follow_system_proxy: bool,
     pub last_checked_at: u64,
 }
 impl Default for UpdatePreferences {
@@ -141,6 +142,7 @@ impl Default for UpdatePreferences {
             auto_check: true,
             auto_download: true,
             preview: false,
+            follow_system_proxy: true,
             last_checked_at: 0,
         }
     }

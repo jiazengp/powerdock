@@ -36,6 +36,8 @@ PowerDock 是 Windows 原生的外设电量工具。在任务栏右下角就能�
 
 如果电脑上只有旧版 MchoseBattery 的设置，PowerDock 会尝试导入。
 
+检查和下载更新默认使用 Windows 系统代理。可在 **设置 → 关于** 调整 **跟随 Windows 系统代理**。
+
 ## 设备访问与隐私
 
 - PowerDock 只读取设备信息和电量。设置和日志都保存在本机。

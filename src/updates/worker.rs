@@ -1,9 +1,9 @@
 //! Out-of-process update check/download entry point.
 use super::*;
 
-fn worker(download: bool, preview: bool) -> Reply {
+fn worker(download: bool, preview: bool, follow_system_proxy: bool) -> Reply {
     let result = (|| {
-        let manager = manager(preview)?;
+        let manager = manager(preview, follow_system_proxy)?;
         check_and_download(
             &manager,
             download,
@@ -101,12 +101,14 @@ pub(super) fn worker_reply(result: Result<Reply, velopack::Error>) -> Reply {
                 !matches!(error, velopack::Error::NotInstalled(_)),
             );
             status.details = error.to_string().chars().take(800).collect();
-            if matches!(&error, velopack::Error::Io(io) if io.kind() == std::io::ErrorKind::TimedOut)
+            if matches!(&error, velopack::Error::Io(io) if io.kind() == std::io::ErrorKind::TimedOut || windows_http::is_timeout(io))
                 || matches!(&error, velopack::Error::Network(network) if matches!(network.as_ref(), velopack::NetworkError::Http(http) if http.to_string().starts_with("timeout: ")))
             {
                 status.state = "timeout".into();
-            }
-            if matches!(source::http_status(&error), Some(403 | 404)) {
+            } else if matches!(&error, velopack::Error::Io(io) if windows_http::is_connection_error(io))
+            {
+                status.state = "windows_connection_error".into();
+            } else if matches!(source::http_status(&error), Some(403 | 404)) {
                 status.state = "source_unavailable".into();
             }
             status.checked_at = Some(settings::now());
@@ -119,13 +121,22 @@ pub(super) fn worker_reply(result: Result<Reply, velopack::Error>) -> Reply {
     }
 }
 pub fn worker_entry(args: &[String]) -> i32 {
-    if args.len() != 2
-        || !["check", "download"].contains(&args[0].as_str())
-        || !["stable", "preview"].contains(&args[1].as_str())
+    let (action, channel, follow_system_proxy) = match args {
+        [action, channel] => (action, channel, true),
+        [action, channel, proxy] if proxy == "system-proxy" => (action, channel, true),
+        [action, channel, proxy] if proxy == "environment-proxy" => (action, channel, false),
+        _ => return 2,
+    };
+    if !["check", "download"].contains(&action.as_str())
+        || !["stable", "preview"].contains(&channel.as_str())
     {
         return 2;
     }
-    let reply = worker(args[0] == "download", args[1] == "preview");
+    let reply = worker(
+        action == "download",
+        channel == "preview",
+        follow_system_proxy,
+    );
     match serde_json::to_string(&reply) {
         Ok(json) => {
             println!("{json}");

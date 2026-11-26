@@ -144,9 +144,9 @@ fn worker_apply_restart() {
     };
     assert_eq!(downloads, expected);
 
-    let mut controller = Controller::new(true, false);
-    *controller.reply.lock().unwrap() = Some(reply);
     let prefs = UpdatePreferences::default();
+    let mut controller = Controller::new(true, &prefs);
+    *controller.reply.lock().unwrap() = Some(reply);
     assert!(controller.tick(&prefs).is_some());
     if case == "changed-after-download" {
         fs::write(&target, "changed after download").unwrap();

@@ -156,7 +156,7 @@ pub(super) fn app() -> App {
         child: None,
         ui: null_mut(),
         page: 0,
-        updates: updates::Controller::new(true, false),
+        updates: updates::Controller::new(true, &config.updates),
         notice_queue: notify::OverlayQueue::default(),
         directory: Some(crate::identity::Directory::default()),
         blocked_reminders: Default::default(),

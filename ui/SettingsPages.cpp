@@ -136,6 +136,7 @@ void MainWindow::ApplyLabels() {
     describe(ThresholdChoice(),L"ReminderDescription");
     describe(AutoCheckSwitch(),L"AutoCheckDescription");
     describe(AutoDownloadSwitch(),L"AutoDownloadDescription");
+    describe(SystemProxySwitch(),L"FollowSystemProxyDescription");
     describe(PreviewSwitch(),L"PreviewDescription");
     describe(NotificationStyleChoice(),L"NotificationFullscreenLimit");
     describe(OverlayTransparencySlider(),L"OverlayTransparencyHint");
@@ -196,10 +197,11 @@ void MainWindow::UpdatePreferences(JsonObject const &data){
     }
     const bool reduceMotion=data.GetNamedBoolean(L"reduce_motion",false);MotionSwitch().IsOn(reduceMotion);if(reduceMotion)StopPageMotion();
     for(auto const &control:{LanguageChoice(),ThemeChoice(),IntervalChoice(),ThresholdChoice(),NotificationStyleChoice()})control.IsEnabled(!preview);
-    for(auto const &control:{StartupSwitch(),MotionSwitch(),AutoCheckSwitch(),AutoDownloadSwitch(),PreviewSwitch()})control.IsEnabled(!preview);
+    for(auto const &control:{StartupSwitch(),MotionSwitch(),AutoCheckSwitch(),AutoDownloadSwitch(),SystemProxySwitch(),PreviewSwitch()})control.IsEnabled(!preview);
     TestNoticeButton().IsEnabled(!preview);
     auto prefs=data.GetNamedObject(L"update_preferences",JsonObject{});
     AutoCheckSwitch().IsOn(prefs.GetNamedBoolean(L"auto_check",true));AutoDownloadSwitch().IsOn(prefs.GetNamedBoolean(L"auto_download",true));PreviewSwitch().IsOn(prefs.GetNamedBoolean(L"preview",false));
+    SystemProxySwitch().IsOn(prefs.GetNamedBoolean(L"follow_system_proxy",true));
     VersionText().Text(Format(L"Version",{{L"version",data.GetNamedString(L"application_version",L"development")}}));
     HIGHCONTRASTW contrast{sizeof(contrast)};SystemParametersInfoW(SPI_GETHIGHCONTRAST,sizeof(contrast),&contrast,0);
     const bool highContrast=(contrast.dwFlags&HCF_HIGHCONTRASTON)!=0;
@@ -209,7 +211,7 @@ void MainWindow::UpdatePreferences(JsonObject const &data){
     AccessibilityStatus().Visibility(highContrast||customTextScale?Visibility::Visible:Visibility::Collapsed);
     auto update=data.GetNamedObject(L"updates",JsonObject{});auto state=update.GetNamedString(L"state",preview?L"demo":L"idle");
     hstring key=L"UpdateIdle";
-    for(auto const &[value,label]:std::initializer_list<std::pair<hstring,hstring>>{{L"checking",L"UpdateChecking"},{L"downloading",L"UpdateDownloading"},{L"available",L"UpdateAvailable"},{L"ready",L"UpdateReady"},{L"current",L"UpdateCurrent"},{L"waiting_stable",L"UpdateWaitingStable"},{L"legacy",L"UpdateLegacy"},{L"no_feed",L"UpdateNoFeed"},{L"source_unavailable",L"UpdateSourceUnavailable"},{L"error",L"UpdateError"},{L"timeout",L"UpdateTimeout"},{L"demo",L"UpdateDemo"}})if(state==value){key=label;break;}
+    for(auto const &[value,label]:std::initializer_list<std::pair<hstring,hstring>>{{L"checking",L"UpdateChecking"},{L"downloading",L"UpdateDownloading"},{L"available",L"UpdateAvailable"},{L"ready",L"UpdateReady"},{L"current",L"UpdateCurrent"},{L"waiting_stable",L"UpdateWaitingStable"},{L"legacy",L"UpdateLegacy"},{L"no_feed",L"UpdateNoFeed"},{L"source_unavailable",L"UpdateSourceUnavailable"},{L"windows_connection_error",L"UpdateWindowsConnectionError"},{L"error",L"UpdateError"},{L"timeout",L"UpdateTimeout"},{L"demo",L"UpdateDemo"}})if(state==value){key=label;break;}
     auto version=update.GetNamedValue(L"version",JsonValue::CreateNullValue());
     UpdateStatusText().Text(Format(key,{{L"version",version.ValueType()==JsonValueType::String?version.GetString():L""}}));
     const bool busy=state==L"checking"||state==L"downloading";const bool managed=update.GetNamedBoolean(L"managed",false);
@@ -283,7 +285,14 @@ void MainWindow::PreferenceToggled(IInspectable const &sender,RoutedEventArgs co
         return;
     }
 
-    auto control=sender.as<ToggleSwitch>();hstring key=sender==MotionSwitch()?L"reduce_motion":sender==AutoCheckSwitch()?L"auto_check":sender==AutoDownloadSwitch()?L"auto_download":L"preview_updates";
+    auto control=sender.as<ToggleSwitch>();
+    hstring key;
+    if(control==MotionSwitch())key=L"reduce_motion";
+    else if(control==AutoCheckSwitch())key=L"auto_check";
+    else if(control==AutoDownloadSwitch())key=L"auto_download";
+    else if(control==SystemProxySwitch())key=L"follow_system_proxy";
+    else if(control==PreviewSwitch())key=L"preview_updates";
+    else return;
     PatchPreference(key,JsonValue::CreateBooleanValue(control.IsOn()));
 }
 void MainWindow::OpenLogsClick(IInspectable const &,RoutedEventArgs const &){SendCommand(106);}

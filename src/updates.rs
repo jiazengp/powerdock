@@ -1,6 +1,7 @@
 //! Short-lived native update worker. A network or patch failure cannot stall HID or shutdown.
 #[path = "updates_source.rs"]
 pub mod source;
+mod windows_http;
 mod worker;
 use crate::settings::{self, UpdatePreferences};
 use serde::{Deserialize, Serialize};
@@ -83,9 +84,9 @@ pub(crate) fn digest(path: &std::path::Path) -> Result<String, String> {
     }
     Ok(hash.finalize().iter().map(|b| format!("{b:02x}")).collect())
 }
-fn manager(preview: bool) -> Result<UpdateManager, velopack::Error> {
+fn manager(preview: bool, follow_system_proxy: bool) -> Result<UpdateManager, velopack::Error> {
     UpdateManager::new(
-        source::Github::new(preview),
+        source::Github::new(preview, follow_system_proxy),
         Some(UpdateOptions {
             AllowVersionDowngrade: false,
             ExplicitChannel: Some(
@@ -176,11 +177,12 @@ pub struct Controller {
     started: Instant,
     last_request: Option<Instant>,
     preview: bool,
+    follow_system_proxy: bool,
     demo: bool,
 }
 impl Controller {
-    pub fn new(demo: bool, preview: bool) -> Self {
-        let managed = !demo && manager(preview).is_ok();
+    pub fn new(demo: bool, prefs: &UpdatePreferences) -> Self {
+        let managed = !demo && manager(prefs.preview, prefs.follow_system_proxy).is_ok();
         Self {
             status: Status::new(
                 if demo {
@@ -200,7 +202,8 @@ impl Controller {
             task: None,
             started: Instant::now(),
             last_request: None,
-            preview,
+            preview: prefs.preview,
+            follow_system_proxy: prefs.follow_system_proxy,
             demo,
         }
     }
@@ -226,6 +229,7 @@ impl Controller {
         let reply = self.reply.clone();
         let stop = self.stop.clone();
         let preview = self.preview;
+        let follow_system_proxy = self.follow_system_proxy;
         let progress = self.progress.clone();
         if let Ok(mut p) = progress.lock() {
             *p = None;
@@ -237,6 +241,11 @@ impl Controller {
                         "--update-worker",
                         if download { "download" } else { "check" },
                         if preview { "preview" } else { "stable" },
+                        if follow_system_proxy {
+                            "system-proxy"
+                        } else {
+                            "environment-proxy"
+                        },
                     ])
                     .creation_flags(0x08000000)
                     .stdout(Stdio::piped())
@@ -319,6 +328,7 @@ impl Controller {
         true
     }
     pub fn tick(&mut self, prefs: &UpdatePreferences) -> Option<u64> {
+        self.configure(prefs);
         if self.busy() {
             self.status.progress = self.progress.lock().ok().and_then(|v| *v);
         }
@@ -333,9 +343,6 @@ impl Controller {
             };
             self.status = reply.status;
             return self.status.checked_at;
-        }
-        if prefs.preview != self.preview {
-            self.reset(prefs.preview);
         }
         if !self.demo
             && prefs.auto_check
@@ -353,7 +360,16 @@ impl Controller {
         }
         None
     }
-    pub fn reset(&mut self, preview: bool) {
+    pub fn configure(&mut self, prefs: &UpdatePreferences) {
+        let channel_changed = self.preview != prefs.preview;
+        if !channel_changed && self.follow_system_proxy == prefs.follow_system_proxy {
+            return;
+        }
+        self.preview = prefs.preview;
+        self.follow_system_proxy = prefs.follow_system_proxy;
+        if !channel_changed && self.ready.is_some() {
+            return;
+        }
         self.cancel();
         self.ready = None;
         self.ready_digest = None;
@@ -363,7 +379,6 @@ impl Controller {
         if let Ok(mut progress) = self.progress.lock() {
             *progress = None;
         }
-        self.preview = preview;
         self.last_request = None;
         self.status = Status::new(
             if self.status.managed {
@@ -402,7 +417,7 @@ impl Controller {
         if self.ready_digest.as_deref() != Some(digest(&target)?.as_str()) {
             return Err("The verified update package has changed; download it again".into());
         }
-        manager(self.preview)
+        manager(self.preview, self.follow_system_proxy)
             .map_err(|e| e.to_string())?
             .wait_exit_then_apply_updates(&info.TargetFullRelease, true, restart, restart_args)
             .map_err(|e| e.to_string())?;

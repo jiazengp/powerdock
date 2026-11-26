@@ -213,6 +213,7 @@
                             </Border>
                             <ToggleSwitch x:Name="AutoCheckSwitch" Tag="loc:AutoCheck" Header="Check for updates automatically" IsOn="True" Toggled="PreferenceToggled" />
                             <ToggleSwitch x:Name="AutoDownloadSwitch" Tag="loc:AutoDownload" Header="Download automatically and install on exit" IsOn="True" Toggled="PreferenceToggled" />
+                            <ToggleSwitch x:Name="SystemProxySwitch" Tag="loc:FollowSystemProxy" Header="Follow Windows system proxy" IsOn="True" Toggled="PreferenceToggled" />
                             <ToggleSwitch x:Name="PreviewSwitch" Tag="loc:PreviewUpdates" Header="Receive preview updates" Toggled="PreferenceToggled" />
                             <StackPanel Spacing="8" HorizontalAlignment="Left">
                                 <HyperlinkButton Tag="loc:Source" Content="Source code" NavigateUri="https://github.com/jiazengp/powerdock" Padding="0" />

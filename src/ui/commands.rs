@@ -283,6 +283,9 @@ impl App {
                 if let Some(value) = patch.preview_updates {
                     next.updates.preview = value;
                 }
+                if let Some(value) = patch.follow_system_proxy {
+                    next.updates.follow_system_proxy = value;
+                }
                 if let Some(value) = patch.notification_style {
                     next.notifications.style = value;
                 }
@@ -313,12 +316,9 @@ impl App {
                 if !next.notifications.after_fullscreen {
                     self.notice_queue.clear_deferred();
                 }
-                let channel_changed = next.updates.preview != self.config.updates.preview;
                 self.config = next;
                 i18n::set_language(self.config.language);
-                if channel_changed {
-                    self.updates.reset(self.config.updates.preview);
-                }
+                self.updates.configure(&self.config.updates);
                 let _ = self.update_tray(false);
                 self.publish_state();
                 success(json!({"applied":true}))

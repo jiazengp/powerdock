@@ -126,10 +126,10 @@ fn provider_cli_requires_explicit_state_and_compiled_ids() {
 fn general_preferences_are_typed_and_strict() {
     assert!(matches!(
         serde_json::from_str::<Operation>(
-            r#"{"operation":"general_set","language":"en-US","preview_updates":true}"#
+            r#"{"operation":"general_set","language":"en-US","preview_updates":true,"follow_system_proxy":false}"#
         )
         .unwrap(),
-        Operation::GeneralSet { .. }
+        Operation::GeneralSet { patch } if patch.follow_system_proxy == Some(false)
     ));
     assert!(
         serde_json::from_str::<Operation>(r#"{"operation":"general_set","language":"xx"}"#)
@@ -138,6 +138,16 @@ fn general_preferences_are_typed_and_strict() {
     assert!(
         serde_json::from_str::<Operation>(r#"{"operation":"general_set","unexpected":true}"#)
             .is_err()
+    );
+    assert!(
+        Cli::try_parse_from([
+            "agent",
+            "settings",
+            "general",
+            "--follow-system-proxy",
+            "false"
+        ])
+        .is_ok()
     );
     assert_eq!(
         run(&[

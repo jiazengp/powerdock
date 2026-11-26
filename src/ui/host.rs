@@ -100,7 +100,7 @@ pub fn run(args: &[String]) -> Result<(), String> {
             }
         };
         let controls = monitor::Controls::new(config.providers.clone());
-        let update_controller = updates::Controller::new(demo, config.updates.preview);
+        let update_controller = updates::Controller::new(demo, &config.updates);
         let mut identity = settings::identity(&updates::launcher_path());
         if demo {
             identity[15] ^= 0x80;

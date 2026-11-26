@@ -50,11 +50,16 @@ void MainWindow::AdvanceNavigationSmoke()
         require(self->OverlayPreferencesPanel().Visibility()==Visibility::Collapsed,"Windows notifications retained overlay controls");
         auto idle=JsonObject::Parse(original.Stringify());
         idle.Insert(L"updates",JsonObject::Parse(L"{\"state\":\"idle\",\"managed\":false}"));
+        idle.Insert(L"update_preferences",JsonObject{});
         self->UpdatePreferences(idle);
         require(self->UpdateCard().Visibility()==Visibility::Collapsed,"empty update card remained visible");
-        idle.Insert(L"updates",JsonObject::Parse(L"{\"state\":\"error\",\"managed\":false}"));
+        require(self->SystemProxySwitch().IsOn(),"system proxy did not default to on");
+        idle.Insert(L"update_preferences",JsonObject::Parse(L"{\"follow_system_proxy\":false}"));
+        idle.Insert(L"updates",JsonObject::Parse(L"{\"state\":\"windows_connection_error\",\"managed\":false}"));
         self->UpdatePreferences(idle);
         require(self->UpdateCard().Visibility()==Visibility::Visible,"update status did not reveal its card");
+        require(!self->SystemProxySwitch().IsOn(),"system proxy opt-out did not reach settings");
+        require(self->UpdateStatusText().Text()==self->Text(L"UpdateWindowsConnectionError"),"Windows connection error was not localized");
         self->UpdatePreferences(original);self->updating=false;
         self->SettingsPage().SelectedItem(self->AboutNav());break;
     }
