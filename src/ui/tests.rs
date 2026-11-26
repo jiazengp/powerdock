@@ -79,13 +79,14 @@ fn identity_failures_remove_pending_and_deferred_notices_without_touching_other_
     app.notice_queue.defer(&blocked);
     app.notice_queue.defer(&unaffected);
     for id in [&old.id, &blocked] {
-        app.notice_queue.enqueue(notify::Notice {
-            key: id.clone(),
-            title: String::new(),
-            body: String::new(),
-            sound: false,
-            test: false,
-        });
+        app.notice_queue.enqueue(notify::Notice::new(
+            id,
+            "",
+            "",
+            notify::TEST_ICON,
+            false,
+            false,
+        ));
     }
     app.devices.remove(0);
     app.blocked_reminders.insert(blocked);
@@ -109,13 +110,14 @@ fn successful_identity_upgrade_preserves_queued_notice_and_migrated_latch() {
     let mut current = old.clone();
     current.id = "canonical".into();
     app.devices = vec![current];
-    app.notice_queue.enqueue(notify::Notice {
-        key: "alias".into(),
-        title: "low".into(),
-        body: String::new(),
-        sound: false,
-        test: false,
-    });
+    app.notice_queue.enqueue(notify::Notice::new(
+        "alias",
+        "low",
+        "",
+        notify::TEST_ICON,
+        false,
+        false,
+    ));
     app.notice_queue.defer("alias");
     app.prune_identity_notices(&[old]);
     assert!(app.notice_queue.busy());
@@ -282,6 +284,20 @@ fn unrelated_profile_preserves_readings_and_deferred_notices_but_alias_revocatio
     assert!(app.devices[0].error.is_some());
     assert_eq!(app.notice_queue.deferred_count(), 0);
 }
+#[test]
+fn tray_withholds_the_previous_icon_while_rescanning() {
+    let mut app = app();
+    app.select_current();
+    let now = settings::now();
+    let current = app.tray_device_icon(now);
+    assert_eq!((current.kind, current.fill), (Kind::Headset, Some(18)));
+
+    // WM_RESCAN invalidates the selected reading before the worker sends a new snapshot.
+    app.last = None;
+    let rescanning = app.tray_device_icon(now);
+    assert_eq!((rescanning.kind, rescanning.fill), (Kind::Other, None));
+}
+
 #[test]
 fn old_cli_fields_preserve_precision_and_read_only_requests_enqueue_no_hardware_work() {
     let mut app = app();

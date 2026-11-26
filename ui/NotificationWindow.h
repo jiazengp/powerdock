@@ -1,4 +1,5 @@
 #pragma once
+#include "NotificationIcon.h"
 #include <memory>
 #include <chrono>
 #include <vector>
@@ -26,6 +27,7 @@ private:
     winrt::Windows::UI::ViewManagement::UISettings::AdvancedEffectsEnabledChanged_revoker effectsChanged;
     winrt::Windows::UI::ViewManagement::UISettings::ColorValuesChanged_revoker colorsChanged;
     winrt::Microsoft::UI::Xaml::Media::SolidColorBrush backgroundBrush{nullptr}, foregroundBrush{nullptr}, accentBrush{nullptr};
+    NotificationIcon deviceIcon;
     HWND hwnd{nullptr}, host{nullptr};
     DWORD parent{0};
     bool reduced{false}, smoke{false}, sound{false}, motionProbe{false};

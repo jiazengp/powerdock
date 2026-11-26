@@ -215,6 +215,7 @@ impl App {
                     "test",
                     &i18n::text("TestNotification"),
                     &i18n::text("TestNotificationBody"),
+                    notify::TEST_ICON,
                     true,
                 );
                 if accepted {

@@ -1020,6 +1020,7 @@ name = "powerdock"
 version = "0.3.0-preview.3"
 dependencies = [
  "async-channel",
+ "base64",
  "clap",
  "futures",
  "futures-timer",

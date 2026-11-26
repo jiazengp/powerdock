@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "NotificationWindow.h"
 #include "Diagnostics.h"
+#include <winrt/Microsoft.UI.Xaml.Automation.Peers.h>
 #include <winrt/Microsoft.UI.Xaml.Hosting.h>
 #include <winrt/Windows.Foundation.Numerics.h>
 #include <cstdio>
@@ -46,15 +47,19 @@ void NotificationWindow::UpdateAppearance() {
     backgroundBrush.Color(highContrast?systemColor(COLOR_WINDOW):Windows::UI::Color{alpha,16,16,16});
     accentBrush.Color(highContrast?systemColor(COLOR_HIGHLIGHT):Windows::UI::Color{alpha,15,108,189});
     foregroundBrush.Color(highContrast?systemColor(COLOR_WINDOWTEXT):Windows::UI::Color{255,245,245,245});
+    deviceIcon.UpdateContrast(highContrast,foregroundBrush.Color());
 }
 
 Window NotificationWindow::Show(std::vector<std::wstring> const &arguments) {
     std::wstring title=L"PowerDock", body, position=L"top-right";
+    std::wstring_view encodedIcon, deviceType;
     bool primary=false;
     for (size_t i=1; i<arguments.size(); ++i) {
         auto const &arg=arguments[i];
         if (arg==L"--title" && i+1<arguments.size()) title=arguments[++i];
         else if (arg==L"--body" && i+1<arguments.size()) body=arguments[++i];
+        else if (arg==L"--device-icon" && i+1<arguments.size()) encodedIcon=arguments[++i];
+        else if (arg==L"--device-type" && i+1<arguments.size()) deviceType=std::wstring_view{arguments[++i]}.substr(0,64);
         else if (arg==L"--host" && i+1<arguments.size()) host=reinterpret_cast<HWND>(_wcstoui64(arguments[++i].c_str(),nullptr,10));
         else if (arg==L"--parent" && i+1<arguments.size()) parent=wcstoul(arguments[++i].c_str(),nullptr,10);
         else if (arg==L"--reduce-motion") reduced=true;
@@ -84,7 +89,6 @@ Window NotificationWindow::Show(std::vector<std::wstring> const &arguments) {
     backgroundBrush=Media::SolidColorBrush{};
     foregroundBrush=Media::SolidColorBrush{};
     accentBrush=Media::SolidColorBrush{};
-    UpdateAppearance();
     window=Window{};
     window.Title(L"PowerDock notification");
     auto presenter=OverlappedPresenter::CreateForContextMenu();
@@ -133,9 +137,12 @@ Window NotificationWindow::Show(std::vector<std::wstring> const &arguments) {
     iconColumn.Width({30,GridUnitType::Pixel});
     content.ColumnDefinitions().Append(iconColumn);
     content.ColumnDefinitions().Append(ColumnDefinition{});
-    FontIcon icon;
-    icon.Glyph(L"\uE83F");icon.FontSize(24);icon.Foreground(foregroundBrush);icon.IsTextScaleFactorEnabled(false);
+    const auto icon=deviceIcon.Create(encodedIcon,deviceType,foregroundBrush);
+    if (smoke && !encodedIcon.empty() && !icon.try_as<Image>()) {
+        std::fputs("Notification device icon failed to load\n",stderr);Close(false);
+    }
     content.Children().Append(icon);
+    UpdateAppearance();
     StackPanel text;
     text.Spacing(4);text.VerticalAlignment(VerticalAlignment::Center);Grid::SetColumn(text,1);
     TextBlock heading;
@@ -150,6 +157,12 @@ Window NotificationWindow::Show(std::vector<std::wstring> const &arguments) {
     viewport.Children().Append(face);
     Automation::AutomationProperties::SetName(viewport,hstring{title}+L" "+hstring{body});
     window.Content(viewport);
+    if (smoke && !deviceType.empty()) {
+        const auto peer=Automation::Peers::FrameworkElementAutomationPeer::CreatePeerForElement(icon);
+        if (!peer || !peer.IsContentElement() || peer.GetName()!=hstring{deviceType}) {
+            std::fputs("Notification device type is missing from UI Automation\n",stderr);Close(false);
+        }
+    }
 
     MONITORINFO monitor{sizeof(monitor)};
     if (!GetMonitorInfoW(primary?MonitorFromPoint({0,0},MONITOR_DEFAULTTOPRIMARY):MonitorFromWindow(GetForegroundWindow(),MONITOR_DEFAULTTONEAREST),&monitor))
@@ -304,6 +317,10 @@ void NotificationWindow::FinishMotion(bool exit) {
         if(!reduced && elapsed<expected-20) {std::fputs("Card animation completed prematurely\n",stderr);Close(false);return;}
         if(!exit) {
             const auto content=face.Child().as<Grid>();
+            const auto icon=content.Children().GetAt(0).try_as<Image>();
+            if(icon && (!icon.Source() || icon.ActualWidth()<=0 || icon.ActualHeight()<=0)) {
+                std::fputs("Notification device icon is not visible\n",stderr);Close(false);return;
+            }
             const auto text=content.Children().GetAt(1).as<StackPanel>();
             const auto bounds=text.TransformToVisual(viewport).TransformBounds({0,0,
                 static_cast<float>(text.ActualWidth()),static_cast<float>(text.ActualHeight())});

@@ -3,6 +3,7 @@
 #[path = "../build_support/locales.rs"]
 mod catalog;
 
+use crate::battery::Kind;
 use serde::{Deserialize, Serialize};
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, clap::ValueEnum)]
 pub enum Language {
@@ -39,6 +40,16 @@ pub fn set_language(language: Language) {
 }
 pub fn text(key: &str) -> String {
     rust_i18n::t!(key).to_string()
+}
+pub fn device_kind(kind: Kind) -> String {
+    text(match kind {
+        Kind::Mouse => "DeviceKindMouse",
+        Kind::Keyboard => "DeviceKindKeyboard",
+        Kind::Headset => "DeviceKindHeadset",
+        Kind::Gamepad => "DeviceKindGamepad",
+        Kind::Phone => "DeviceKindPhone",
+        Kind::Other => "DeviceKindOther",
+    })
 }
 include!(concat!(env!("OUT_DIR"), "/status_keys.rs"));
 /// Internal protocol errors retain their stable identifiers; translate at presentation time.

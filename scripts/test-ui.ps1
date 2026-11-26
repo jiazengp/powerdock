@@ -33,6 +33,14 @@ foreach($theme in @('light','dark')){
     if($page -eq 'notification'){
         $launchArguments+=@('--position',$position,'--transparency',[string]$scenario.Transparency)
     }
+    if($page -eq 'notification' -and $position -eq 'bottom-right'){
+        $pixels = [byte[]]::new(64 * 64 * 4)
+        for ($offset = 0; $offset -lt $pixels.Length; $offset += 4) {
+            $pixels[$offset + 2] = 255
+            $pixels[$offset + 3] = 255
+        }
+        $launchArguments += @('--device-icon', [Convert]::ToBase64String($pixels), '--device-type', 'Mouse')
+    }
     if($page -eq 'notification' -and $theme -eq 'light'){$launchArguments+=@('--reduce-motion','--primary-monitor')}
     foreach($arg in $launchArguments){$start.ArgumentList.Add($arg)}
     $process=[Diagnostics.Process]::Start($start)

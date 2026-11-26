@@ -1,11 +1,45 @@
-//! Full-size Fluent system Mouse glyph with a proportional battery badge.
-//! Rasterize only when data, theme or physical tray size changes.
-use crate::{battery::Kind, settings::wide};
+//! Shared peripheral glyph and proportional battery badge for the tray and overlay.
+pub mod notification;
+
+use crate::{
+    battery::{Kind, Power, Reading},
+    settings::wide,
+};
 use std::{
     mem::{size_of, zeroed},
     ptr::null_mut,
 };
 use windows_sys::Win32::{Foundation::*, Graphics::Gdi::*, UI::WindowsAndMessaging::*};
+
+#[derive(Clone, Copy, Debug)]
+pub struct DeviceIcon {
+    pub kind: Kind,
+    pub fill: Option<u8>,
+    pub charging: bool,
+}
+
+impl DeviceIcon {
+    pub fn from_reading(reading: &Reading) -> Self {
+        Self {
+            kind: reading.kind,
+            fill: reading.value.icon_fill(),
+            charging: reading.power == Power::Charging && reading.percent().is_some(),
+        }
+    }
+
+    pub fn unknown(kind: Kind) -> Self {
+        Self {
+            kind,
+            fill: None,
+            charging: false,
+        }
+    }
+
+    pub fn appearance(self, dark: bool, high_contrast: bool) -> Appearance {
+        appearance(dark, high_contrast, self.fill, self.charging)
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Appearance {
     pub foreground: u32,
@@ -14,7 +48,7 @@ pub struct Appearance {
 const fn rgb(r: u8, g: u8, b: u8) -> u32 {
     (r as u32) | ((g as u32) << 8) | ((b as u32) << 16)
 }
-pub fn appearance(dark: bool, hc: bool, percent: Option<u8>, charging: bool) -> Appearance {
+fn appearance(dark: bool, hc: bool, percent: Option<u8>, charging: bool) -> Appearance {
     let foreground = unsafe {
         if hc {
             GetSysColor(COLOR_WINDOWTEXT)
@@ -71,7 +105,7 @@ fn rounded(x: f32, y: f32, b: [f32; 4], radius: f32) -> bool {
     let cy = y.clamp(t + radius, bottom - radius);
     (x - cx) * (x - cx) + (y - cy) * (y - cy) <= radius * radius
 }
-/// Full-size system Mouse glyph with a lower-right battery modifier.
+/// System peripheral glyph with a lower-right battery modifier.
 /// Percentage is deliberately in the Shell tooltip and panel, not tiny tray numerals.
 pub fn pixels(percent: Option<u8>, style: Appearance, size: i32) -> Result<Vec<u32>, String> {
     pixels_for(percent, style, size, Kind::Mouse)
@@ -84,7 +118,7 @@ pub fn pixels_for(
 ) -> Result<Vec<u32>, String> {
     unsafe {
         if !(16..=128).contains(&size) {
-            return Err("无效的托盘图标尺寸".into());
+            return Err("无效的设备图标尺寸".into());
         }
         let factor = 4;
         let side = size * factor;
@@ -102,7 +136,7 @@ pub fn pixels_for(
         let bitmap = CreateDIBSection(dc, &info, DIB_RGB_COLORS, &mut bits, null_mut(), 0);
         if bitmap.is_null() {
             DeleteDC(dc);
-            return Err("无法创建鼠标字形位图".into());
+            return Err("无法创建设备字形位图".into());
         }
         std::ptr::write_bytes(bits.cast::<u8>(), 0, (side * side * 4) as usize);
         let previous = SelectObject(dc, bitmap);
@@ -160,8 +194,8 @@ pub fn pixels_for(
         let scale = (14.9 / glyph_height).min(13.6 / glyph_width);
         let height = glyph_height * scale;
         let width = glyph_width * scale;
-        let mouse_left = (14.3 - width) / 2.0;
-        let mouse_top = (15.6 - height) / 2.0;
+        let glyph_left = (14.3 - width) / 2.0;
+        let glyph_top = (15.6 - height) / 2.0;
         let ink = channels(style.foreground);
         let fill = channels(style.fill);
         let unit = 16.0 / side as f32;
@@ -174,13 +208,13 @@ pub fn pixels_for(
                         let x = (px * factor + sx) as f32 * unit + unit / 2.0;
                         let y = (py * factor + sy) as f32 * unit + unit / 2.0;
                         let mut p = [0.0; 4];
-                        if x >= mouse_left
-                            && x < mouse_left + width
-                            && y >= mouse_top
-                            && y < mouse_top + height
+                        if x >= glyph_left
+                            && x < glyph_left + width
+                            && y >= glyph_top
+                            && y < glyph_top + height
                         {
-                            let gx = left + ((x - mouse_left) / width * glyph_width) as i32;
-                            let gy = top + ((y - mouse_top) / height * glyph_height) as i32;
+                            let gx = left + ((x - glyph_left) / width * glyph_width) as i32;
+                            let gy = top + ((y - glyph_top) / height * glyph_height) as i32;
                             if gx >= 0 && gx < side && gy >= 0 && gy < side {
                                 let a = (mask[(gy * side + gx) as usize] & 255) as f32 / 255.0;
                                 p = [ink[0] * a, ink[1] * a, ink[2] * a, 255.0 * a];
@@ -222,14 +256,9 @@ pub fn pixels_for(
         Ok(result)
     }
 }
-pub fn create(
-    percent: Option<u8>,
-    style: Appearance,
-    size: i32,
-    kind: Kind,
-) -> Result<HICON, String> {
+pub fn create(device: DeviceIcon, style: Appearance, size: i32) -> Result<HICON, String> {
     unsafe {
-        let pixels = pixels_for(percent, style, size, kind)?;
+        let pixels = pixels_for(device.fill, style, size, device.kind)?;
         let mut info: BITMAPINFO = zeroed();
         info.bmiHeader.biSize = size_of::<BITMAPINFOHEADER>() as u32;
         info.bmiHeader.biWidth = size;
@@ -239,7 +268,7 @@ pub fn create(
         let mut bits = null_mut();
         let image = CreateDIBSection(null_mut(), &info, DIB_RGB_COLORS, &mut bits, null_mut(), 0);
         if image.is_null() {
-            return Err("无法创建鼠标图标位图".into());
+            return Err("无法创建电量图标位图".into());
         }
         std::ptr::copy_nonoverlapping(pixels.as_ptr(), bits.cast(), pixels.len());
         let mask_bits = vec![0u8; (((size + 15) / 16) * 2 * size) as usize];
@@ -254,7 +283,7 @@ pub fn create(
         DeleteObject(mask);
         DeleteObject(image);
         if icon.is_null() {
-            Err("无法创建鼠标电量图标".into())
+            Err("无法创建设备电量图标".into())
         } else {
             Ok(icon)
         }

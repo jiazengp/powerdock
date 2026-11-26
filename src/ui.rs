@@ -15,7 +15,7 @@ use startup::{set_startup, startup_enabled};
 
 use crate::{
     agent,
-    battery::{self, Kind, Power, Reading, Source, Tracked},
+    battery::{self, Kind, Reading, Source, Tracked},
     i18n, icon,
     monitor::{self, Command, Snapshot},
     notify,

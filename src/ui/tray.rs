@@ -2,6 +2,21 @@
 use super::*;
 
 impl App {
+    pub(super) fn tray_device_icon(&self, now: u64) -> icon::DeviceIcon {
+        self.last
+            .as_ref()
+            .filter(|_| {
+                self.devices
+                    .iter()
+                    .find(|device| Some(&device.id) == self.selected.as_ref())
+                    .is_some_and(|device| device.reading(now).is_some())
+            })
+            .map_or_else(
+                || icon::DeviceIcon::unknown(self.kind()),
+                |(reading, _)| icon::DeviceIcon::from_reading(reading),
+            )
+    }
+
     pub(super) fn tray_data(&self) -> NOTIFYICONDATAW {
         unsafe {
             let mut data: NOTIFYICONDATAW = zeroed();
@@ -23,30 +38,14 @@ impl App {
             }
             let size = GetSystemMetricsForDpi(SM_CXSMICON, self.dpi).max(16);
             let number = self.number();
-            let percent = self
-                .last
-                .as_ref()
-                .filter(|_| {
-                    self.devices
-                        .iter()
-                        .find(|d| Some(&d.id) == self.selected.as_ref())
-                        .is_some_and(|d| d.reading(settings::now()).is_some())
-                })
-                .and_then(|(r, _)| r.value.icon_fill());
-            let charging = self
-                .last
-                .as_ref()
-                .is_some_and(|(r, _)| r.power == Power::Charging)
-                && self.fresh();
-            let style = icon::appearance(self.dark, high_contrast(), percent, charging);
+            let device = self.tray_device_icon(settings::now());
+            let style = device.appearance(self.dark, high_contrast());
             let key = format!(
-                "{number}:{}:{}:{size}:{percent:?}:{:?}",
-                style.foreground,
-                style.fill,
-                self.kind()
+                "{number}:{}:{}:{size}:{:?}:{:?}",
+                style.foreground, style.fill, device.fill, device.kind
             );
             let new_icon = if add || key != self.icon_key {
-                Some(icon::create(percent, style, size, self.kind())?)
+                Some(icon::create(device, style, size)?)
             } else {
                 None
             };

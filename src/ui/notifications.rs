@@ -54,7 +54,13 @@ impl App {
                     name = device.name,
                     percent = reading.percent().map(|p| p.to_string()).unwrap_or_default()
                 );
-                if self.send_notice(&device.id, &i18n::text("NotificationTitle"), &body, false) {
+                if self.send_notice(
+                    &device.id,
+                    &i18n::text("NotificationTitle"),
+                    &body,
+                    icon::DeviceIcon::from_reading(&reading),
+                    false,
+                ) {
                     if let Some(memory) = self.config.device_alerts.get_mut(&device.id) {
                         memory.sent(settings::now());
                     }
@@ -65,7 +71,14 @@ impl App {
             }
         }
     }
-    pub(super) fn send_notice(&mut self, key: &str, title: &str, body: &str, test: bool) -> bool {
+    pub(super) fn send_notice(
+        &mut self,
+        key: &str,
+        title: &str,
+        body: &str,
+        icon: icon::DeviceIcon,
+        test: bool,
+    ) -> bool {
         if self.demo {
             return false;
         }
@@ -81,13 +94,14 @@ impl App {
                 self.notice_queue.defer_while_idle(key.into());
                 self.pump_notices();
             } else {
-                self.notice_queue.enqueue(notify::Notice {
-                    key: key.into(),
-                    title: title.into(),
-                    body: body.into(),
-                    sound: prefs.sound && !prefs.style.windows(),
+                self.notice_queue.enqueue(notify::Notice::new(
+                    key,
+                    title,
+                    body,
+                    icon,
+                    prefs.sound && !prefs.style.windows(),
                     test,
-                });
+                ));
                 if prefs.after_fullscreen && !test && notify::fullscreen_application() {
                     self.notice_queue.defer(key);
                 }
@@ -258,13 +272,14 @@ impl App {
                 name = device.name,
                 percent = reading.percent().map(|p| p.to_string()).unwrap_or_default()
             );
-            let notice = notify::Notice {
-                key: id.clone(),
-                title: i18n::text("NotificationTitle"),
-                body: body.into_owned(),
+            let notice = notify::Notice::new(
+                &id,
+                i18n::text("NotificationTitle"),
+                body.into_owned(),
+                icon::DeviceIcon::from_reading(reading),
                 sound,
-                test: false,
-            };
+                false,
+            );
             self.notice_queue.verifying.remove(&id);
             self.notice_queue.enqueue(notice);
             crate::diagnostics::record(

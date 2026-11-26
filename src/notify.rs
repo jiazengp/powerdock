@@ -1,4 +1,4 @@
-use crate::settings;
+use crate::{battery::Kind, i18n, icon, settings};
 use windows::{
     Data::Xml::Dom::XmlDocument,
     UI::Notifications::{ToastNotification, ToastNotificationManager},
@@ -14,6 +14,12 @@ use windows::{
 };
 
 const APP_ID: &str = "PowerDock.Native";
+pub const TEST_ICON: icon::DeviceIcon = icon::DeviceIcon {
+    kind: Kind::Mouse,
+    fill: Some(15),
+    charging: false,
+};
+
 pub struct Com;
 impl Com {
     pub fn initialize() -> Result<Self, String> {
@@ -92,11 +98,33 @@ use std::{
 };
 #[derive(Clone, Debug)]
 pub struct Notice {
-    pub key: String,
-    pub title: String,
-    pub body: String,
-    pub sound: bool,
-    pub test: bool,
+    key: String,
+    title: String,
+    body: String,
+    icon: icon::DeviceIcon,
+    device_type: String,
+    sound: bool,
+    test: bool,
+}
+impl Notice {
+    pub fn new(
+        key: impl Into<String>,
+        title: impl Into<String>,
+        body: impl Into<String>,
+        icon: icon::DeviceIcon,
+        sound: bool,
+        test: bool,
+    ) -> Self {
+        Self {
+            key: key.into(),
+            title: title.into(),
+            body: body.into(),
+            icon,
+            device_type: i18n::device_kind(icon.kind),
+            sound,
+            test,
+        }
+    }
 }
 #[derive(Clone, Copy)]
 pub struct DeferredRefresh {
@@ -263,6 +291,14 @@ impl OverlayQueue {
                     "--transparency",
                     &prefs.transparency_percent.to_string(),
                 ]);
+                if let Ok(encoded) = icon::notification::encode(notice.icon) {
+                    command.args([
+                        "--device-icon",
+                        &encoded,
+                        "--device-type",
+                        &notice.device_type,
+                    ]);
+                }
                 if prefs.monitor == settings::OverlayMonitor::Primary {
                     command.arg("--primary-monitor");
                 }
@@ -400,13 +436,7 @@ mod queue_tests {
             ("other", "other"),
             ("canonical", "duplicate"),
         ] {
-            queue.enqueue(Notice {
-                key: key.into(),
-                title: title.into(),
-                body: String::new(),
-                sound: false,
-                test: false,
-            });
+            queue.enqueue(Notice::new(key, title, "", TEST_ICON, false, false));
             queue.defer(key);
         }
         queue.rename_device("alias", "canonical");
@@ -483,22 +513,10 @@ mod queue_tests {
     fn queue_replaces_same_device_and_bounds_bursts() {
         let mut queue = OverlayQueue::default();
         for i in 0..20 {
-            queue.enqueue(Notice {
-                key: i.to_string(),
-                title: String::new(),
-                body: String::new(),
-                sound: false,
-                test: false,
-            });
+            queue.enqueue(Notice::new(i.to_string(), "", "", TEST_ICON, false, false));
         }
         assert_eq!(queue.pending.len(), crate::battery::MAX_DEVICES);
-        queue.enqueue(Notice {
-            key: "19".into(),
-            title: "updated".into(),
-            body: String::new(),
-            sound: false,
-            test: false,
-        });
+        queue.enqueue(Notice::new("19", "updated", "", TEST_ICON, false, false));
         assert_eq!(queue.pending.len(), crate::battery::MAX_DEVICES);
         assert_eq!(queue.pending.back().unwrap().title, "updated");
         queue.defer("a");
@@ -516,13 +534,7 @@ mod queue_tests {
     fn idle_deferral_keeps_manual_tests_and_deduplicates_fullscreen_replay() {
         let mut queue = OverlayQueue::default();
         for (key, test) in [("mouse", false), ("test", true)] {
-            queue.enqueue(Notice {
-                key: key.into(),
-                title: String::new(),
-                body: String::new(),
-                sound: false,
-                test,
-            });
+            queue.enqueue(Notice::new(key, "", "", TEST_ICON, false, test));
         }
         queue.defer("mouse");
         queue.defer_pending_while_idle();

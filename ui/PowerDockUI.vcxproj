@@ -64,10 +64,12 @@
   <ItemGroup><ApplicationDefinition Include="App.xaml" /><Page Include="MainWindow.xaml" /></ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
+    <ClInclude Include="NotificationIcon.h" />
     <ClInclude Include="App.xaml.h"><DependentUpon>App.xaml</DependentUpon></ClInclude>
     <ClInclude Include="MainWindow.xaml.h"><DependentUpon>MainWindow.xaml</DependentUpon></ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="NotificationIcon.cpp"/>
     <ClCompile Include="NotificationWindow.cpp"/>
     <ClCompile Include="SettingsPages.cpp"/>
     <ClCompile Include="ChargingPresentation.cpp"/>
