@@ -1,6 +1,6 @@
 [package]
 name = "powerdock"
-version = "0.3.0-preview.3"
+version = "0.3.0-preview.4"
 edition = "2024"
 rust-version = "1.99.0"
 license = "MIT"

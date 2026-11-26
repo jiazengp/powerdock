@@ -1,6 +1,6 @@
 # PowerDock
 
-![开发预览](https://img.shields.io/badge/status-0.3.0--preview.3-orange)
+![开发预览](https://img.shields.io/badge/status-0.3.0--preview.4-orange)
 ![Windows 11 x64](https://img.shields.io/badge/Windows-11%20x64-0078D4)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
 
